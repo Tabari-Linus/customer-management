@@ -2,6 +2,8 @@ from django.shortcuts import redirect, render
 from django.http import HttpResponse
 from .models import *
 from .forms import OrderForm
+from django.forms import inlineformset_factory
+from .filters import OrderFilter
 # Create your views here.
 def home(request):
     orders = Order.objects.all()
@@ -24,21 +26,29 @@ def products(request):
 
 def customer(request, pk):
     customer = Customer.objects.get(id=pk)
+
     orders = customer.order_set.all()
     orders_count = orders.count()
-    context ={'customer': customer, 'orders': orders, 'orders_count':orders_count}
+
+    myFilter = OrderFilter(request.GET, queryset = orders)
+    orders = myFilter.qs
+    context ={'customer': customer, 'orders': orders, 'orders_count':orders_count, 'myFilter':myFilter}
     return render(request, 'accounts/customer.html', context)
 
 
-def createOrder(request):
-    form = OrderForm()
+def createOrder(request, pk):
+    OrderFormSet = inlineformset_factory(Customer,Order,fields=('product', 'status'), extra = 5)
+    customer = Customer.objects.get(id = pk)
+    # form = OrderForm(initial={'customer': customer})
+    formset = OrderFormSet(queryset=Order.objects.none() ,instance=customer)
     if request.method == "POST":
-        form = OrderForm(request.POST)
-        if form.is_valid():
-            form.save()
+        # form = OrderForm(request.POST)
+        formset = OrderFormSet(request.POST , instance=customer)
+        if formset.is_valid():
+            formset.save()
             return redirect('/')
 
-    context = {'form': form}
+    context = {'formset': formset}
     return render(request, 'accounts/order_form.html', context)
 
 
